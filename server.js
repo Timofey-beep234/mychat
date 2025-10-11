@@ -3,7 +3,6 @@ const express = require('express');
 const http = require('http');
 const socketio = require('socket.io');
 const multer = require('multer');
-const path = require('path');
 const app = express();
 const server = http.createServer(app);
 const io = socketio(server);
@@ -13,22 +12,31 @@ app.use(express.static('public'));
 
 const upload = multer({ dest: 'public/uploads/' });
 
-let users = {}; // username: {password, contacts: [], messages: {contact: [messages]}}
-let onlineUsers = {}; // socket.id: username
+/*
+users: {
+  phone: {
+    password: string,
+    contacts: [{ phone: string }],
+    messages: { [contactPhone]: [msg] }
+  }
+}
+*/
+let users = {};
+let onlineUsers = {}; // socketId: phone
 
 app.post('/register', (req, res) => {
-  const { username, password } = req.body;
-  if (users[username]) return res.status(400).json({ msg: 'User exists' });
-  users[username] = { password, contacts: [], messages: {} };
+  const { phone, password } = req.body;
+  if (users[phone]) return res.status(400).json({ msg: 'User exists' });
+  users[phone] = { password, contacts: [], messages: {} };
   res.json({ msg: 'Registered' });
 });
 
 app.post('/login', (req, res) => {
-  const { username, password } = req.body;
-  if (users[username] && users[username].password === password) {
-    res.json({ msg: 'Logged in', contacts: users[username].contacts });
+  const { phone, password } = req.body;
+  if (users[phone] && users[phone].password === password) {
+    res.json({ msg: 'Logged in', contacts: users[phone].contacts });
   } else {
-    res.status(400).json({ msg: 'Wrong username or password' });
+    res.status(400).json({ msg: 'Wrong phone or password' });
   }
 });
 
@@ -39,35 +47,35 @@ app.post('/upload', upload.single('photo'), (req, res) => {
 io.on('connection', (socket) => {
   let currentUser = null;
 
-  socket.on('login', (username) => {
-    currentUser = username;
-    onlineUsers[socket.id] = username;
+  socket.on('login', (phone) => {
+    currentUser = phone;
+    onlineUsers[socket.id] = phone;
   });
 
-  socket.on('addContact', (contact) => {
-    if (!users[currentUser].contacts.includes(contact)) {
-      users[currentUser].contacts.push(contact);
-      users[currentUser].messages[contact] = users[currentUser].messages[contact] || [];
+  socket.on('addContact', (contactPhone) => {
+    if (!users[currentUser]) return;
+    if (!users[currentUser].contacts.find(c => c.phone === contactPhone)) {
+      users[currentUser].contacts.push({ phone: contactPhone });
+      users[currentUser].messages[contactPhone] = users[currentUser].messages[contactPhone] || [];
     }
+    socket.emit('updateContacts', users[currentUser].contacts);
   });
 
   socket.on('sendMessage', ({ to, text, type }) => {
-    const msg = { from: currentUser, text, type, time: Date.now() };
+    if (!users[currentUser]) return;
     if (!users[currentUser].messages[to]) users[currentUser].messages[to] = [];
+    if (!users[to]) return; // Recipient must be registered
     if (!users[to].messages[currentUser]) users[to].messages[currentUser] = [];
+
+    const msg = { from: currentUser, text, type, time: Date.now() };
     users[currentUser].messages[to].push(msg);
     users[to].messages[currentUser].push(msg);
-    io.sockets.sockets.forEach((s) => {
-      if (onlineUsers[s.id] === to || onlineUsers[s.id] === currentUser) {
-        s.emit('newMessage', { contact: (onlineUsers[s.id] === to) ? currentUser : to, message: msg });
-      }
-    });
-  });
 
-  socket.on('callUser', ({ to }) => {
+    // Notify sender and receiver
     io.sockets.sockets.forEach((s) => {
-      if (onlineUsers[s.id] === to) {
-        s.emit('incomingCall', { from: currentUser });
+      const phone = onlineUsers[s.id];
+      if (phone === to || phone === currentUser) {
+        s.emit('newMessage', { contact: (phone === to) ? currentUser : to, message: msg });
       }
     });
   });
