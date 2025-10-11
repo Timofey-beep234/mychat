@@ -3,6 +3,7 @@
 <html>
 <head>
 <title>Chat</title>
+<meta charset="UTF-8" />
 <style>
   body {
     background-color: #007bff;
@@ -82,7 +83,7 @@
     background: rgba(0, 0, 50, 0.6);
     display: flex;
   }
-  #contactNameInput {
+  #contactPhoneInput {
     flex: 1;
     padding: 8px;
     border-radius: 4px;
@@ -94,7 +95,7 @@
 <body>
 <div id="login">
   <h2>Вход / Регистрация</h2>
-  <input id="username" placeholder="Имя пользователя" />
+  <input id="phone" placeholder="Номер телефона" />
   <input id="password" type="password" placeholder="Пароль" />
   <button id="btnLogin">Войти</button>
   <button id="btnRegister">Регистрация</button>
@@ -105,7 +106,7 @@
   <div id="contactsDiv">
     <ul id="contacts"></ul>
     <div id="addContactDiv">
-      <input id="contactNameInput" placeholder="Имя нового контакта" />
+      <input id="contactPhoneInput" placeholder="Номер телефона нового контакта" />
       <button id="btnAddContact">Добавить</button>
     </div>
   </div>
@@ -124,13 +125,13 @@
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const socket = io();
-let username = null;
+let phone = null;
 let activeContact = null;
 const usersMessages = {};
 
 const loginSection = document.getElementById('login');
 const chatSection = document.getElementById('chat');
-const usernameInput = document.getElementById('username');
+const phoneInput = document.getElementById('phone');
 const passwordInput = document.getElementById('password');
 const btnLogin = document.getElementById('btnLogin');
 const btnRegister = document.getElementById('btnRegister');
@@ -141,17 +142,17 @@ const msgInput = document.getElementById('msgInput');
 const btnSend = document.getElementById('btnSend');
 const btnPhoto = document.getElementById('btnPhoto');
 const photoInput = document.getElementById('photoInput');
-const contactNameInput = document.getElementById('contactNameInput');
+const contactPhoneInput = document.getElementById('contactPhoneInput');
 const btnAddContact = document.getElementById('btnAddContact');
 
 btnRegister.onclick = async () => {
-  const u = usernameInput.value.trim();
-  const p = passwordInput.value.trim();
-  if (!u || !p) return alert('Введите имя и пароль');
+  const p = phoneInput.value.trim();
+  const pass = passwordInput.value.trim();
+  if (!p || !pass) return alert('Введите номер и пароль');
   const res = await fetch('/register', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({username:u, password:p})
+    body: JSON.stringify({phone: p, password: pass})
   });
   if(res.ok) {
     loginMsg.textContent = 'Успешно зарегистрирован, войдите.';
@@ -162,20 +163,20 @@ btnRegister.onclick = async () => {
 };
 
 btnLogin.onclick = async () => {
-  const u = usernameInput.value.trim();
-  const p = passwordInput.value.trim();
-  if(!u || !p) return alert('Введите имя и пароль');
+  const p = phoneInput.value.trim();
+  const pass = passwordInput.value.trim();
+  if(!p || !pass) return alert('Введите номер и пароль');
   const res = await fetch('/login', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({username:u, password:p})
+    body: JSON.stringify({phone: p, password: pass})
   });
   if(res.ok) {
     const data = await res.json();
-    username = u;
+    phone = p;
     loginSection.style.display = 'none';
     chatSection.style.display = 'flex';
-    socket.emit('login', username);
+    socket.emit('login', phone);
     updateContacts(data.contacts);
   } else {
     const data = await res.json();
@@ -184,22 +185,24 @@ btnLogin.onclick = async () => {
 };
 
 btnAddContact.onclick = () => {
-  const contactName = contactNameInput.value.trim();
-  if (!contactName) return alert('Введите имя контакта');
-  socket.emit('addContact', contactName);
-  if (!usersMessages[contactName]) usersMessages[contactName] = [];
+  const contactPhone = contactPhoneInput.value.trim();
+  if(!contactPhone) return alert('Введите номер контакта');
+  socket.emit('addContact', contactPhone);
+  if(!usersMessages[contactPhone]) usersMessages[contactPhone] = [];
   updateContacts(usersMessages ? Object.keys(usersMessages) : []);
-  contactNameInput.value = '';
+  activeContact = contactPhone;
+  showMessages(contactPhone);
+  contactPhoneInput.value = '';
 };
 
 function updateContacts(contacts) {
   contactsList.innerHTML = '';
   contacts.forEach(c => {
     const li = document.createElement('li');
-    li.textContent = c;
+    li.textContent = c.phone;
     li.onclick = () => {
-      activeContact = c;
-      showMessages(c);
+      activeContact = c.phone;
+      showMessages(activeContact);
       Array.from(contactsList.children).forEach(li => li.classList.remove('active'));
       li.classList.add('active');
     };
@@ -210,37 +213,37 @@ function updateContacts(contacts) {
 function showMessages(contact) {
   messagesList.innerHTML = '';
   activeContact = contact;
-  if (!usersMessages[contact]) usersMessages[contact] = [];
+  if(!usersMessages[contact]) usersMessages[contact] = [];
   usersMessages[contact].forEach(m => addMessage(m));
 }
 
 btnSend.onclick = () => {
-  if (!activeContact) return alert('Выберите контакт');
+  if(!activeContact) return alert('Выберите контакт');
   const text = msgInput.value.trim();
-  if (!text) return;
+  if(!text) return;
   sendMessage(activeContact, text, 'text');
   msgInput.value = '';
 };
 
 function sendMessage(to, text, type) {
-  const msg = {from: username, text, type, time: Date.now()};
-  if (!usersMessages[to]) usersMessages[to] = [];
+  const msg = {from: phone, text, type, time: Date.now()};
+  if(!usersMessages[to]) usersMessages[to] = [];
   usersMessages[to].push(msg);
   addMessage(msg);
   socket.emit('sendMessage', {to, text, type});
 }
 
 socket.on('newMessage', ({contact, message}) => {
-  if (!usersMessages[contact]) usersMessages[contact] = [];
+  if(!usersMessages[contact]) usersMessages[contact] = [];
   usersMessages[contact].push(message);
-  if (contact === activeContact) addMessage(message);
+  if(contact === activeContact) addMessage(message);
 });
 
-function addMessage({from, text, type, time}) {
+function addMessage({from, text, type}) {
   const div = document.createElement('div');
   div.classList.add('message');
   let content = `<strong>${from}</strong>: `;
-  if (type === 'text') content += text;
+  if(type === 'text') content += text;
   else if(type === 'photo') content += `<br><img src="${text}" style="max-width:200px">`;
   div.innerHTML = content;
   messagesList.appendChild(div);
@@ -250,25 +253,16 @@ function addMessage({from, text, type, time}) {
 btnPhoto.onclick = () => photoInput.click();
 
 photoInput.onchange = async () => {
-  if (!photoInput.files.length) return;
+  if(!photoInput.files.length) return;
   const file = photoInput.files[0];
   const formData = new FormData();
   formData.append('photo', file);
-  const res = await fetch('/upload', {method:'POST', body: formData});
+  const res = await fetch('/upload', {method:'POST', body:formData});
   if(res.ok) {
     const data = await res.json();
     sendMessage(activeContact, data.url, 'photo');
   }
   photoInput.value = '';
-};
-
-// Incoming call notification example
-socket.on('incomingCall', ({from}) => {
-  if(confirm(`Звонок от ${from}. Принять?`)) {
-    alert('Звонок начат (функционал нужно доработать)');
-  } else {
-    alert('Звонок отклонен');
-  }
 });
 </script>
 </body>
