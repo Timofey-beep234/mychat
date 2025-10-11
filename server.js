@@ -1,6 +1,9 @@
+// server.js
 const express = require('express');
 const http = require('http');
 const socketio = require('socket.io');
+const multer = require('multer');
+const path = require('path');
 const app = express();
 const server = http.createServer(app);
 const io = socketio(server);
@@ -8,52 +11,73 @@ const io = socketio(server);
 app.use(express.json());
 app.use(express.static('public'));
 
-let users = {}; // для хранения username и password
+const upload = multer({ dest: 'public/uploads/' });
 
-// Регистрация
+let users = {}; // username: {password, contacts: [], messages: {contact: [messages]}}
+let onlineUsers = {}; // socket.id: username
+
 app.post('/register', (req, res) => {
   const { username, password } = req.body;
   if (users[username]) {
-    return res.status(400).json({ msg: 'Пользователь уже существует' });
+    return res.status(400).json({ msg: 'User exists' });
   }
-  users[username] = password;
-  res.json({ msg: 'Регистрация успешна' });
+  users[username] = { password, contacts: [], messages: {} };
+  res.json({ msg: 'Registered' });
 });
 
-// Вход
 app.post('/login', (req, res) => {
   const { username, password } = req.body;
-  if (users[username] && users[username] === password) {
-    res.json({ msg: 'Вход выполнен' });
+  if (users[username] && users[username].password === password) {
+    res.json({ msg: 'Logged in', contacts: users[username].contacts });
   } else {
-    res.status(400).json({ msg: 'Неверный логин или пароль' });
+    res.status(400).json({ msg: 'Wrong username or password' });
   }
 });
 
-// WebSocket соединение
-io.on('connection', (socket) => {
-  console.log('Пользователь подключился');
+app.post('/upload', upload.single('photo'), (req, res) => {
+  res.json({ url: `/uploads/${req.file.filename}` });
+});
 
-  // Вход в комнату
-  socket.on('joinRoom', ({ username, room }) => {
-    socket.username = username;
-    socket.room = room;
-    socket.join(room);
-    socket.emit('message', { user: 'Сервер', text: `Добро пожаловать в ${room}, ${username}!` });
-    socket.to(room).emit('message', { user: 'Сервер', text: `${username} присоединился к чату` });
+io.on('connection', (socket) => {
+  let currentUser = null;
+
+  socket.on('login', (username) => {
+    currentUser = username;
+    onlineUsers[socket.id] = username;
   });
 
-  // Приём сообщения и его отправка в выбранную комнату с именем пользователя
-  socket.on('chatMessage', (msg) => {
-    io.to(socket.room).emit('message', { user: socket.username, text: msg });
+  socket.on('addContact', (contact) => {
+    if (!users[currentUser].contacts.includes(contact)) {
+      users[currentUser].contacts.push(contact);
+      users[currentUser].messages[contact] = users[currentUser].messages[contact] || [];
+    }
+  });
+
+  socket.on('sendMessage', ({ to, text, type }) => {
+    const msg = { from: currentUser, text, type, time: Date.now() };
+    if (!users[currentUser].messages[to]) users[currentUser].messages[to] = [];
+    if (!users[to].messages[currentUser]) users[to].messages[currentUser] = [];
+    users[currentUser].messages[to].push(msg);
+    users[to].messages[currentUser].push(msg);
+    io.sockets.sockets.forEach((s) => {
+      if (onlineUsers[s.id] === to || onlineUsers[s.id] === currentUser) {
+        s.emit('newMessage', { contact: (onlineUsers[s.id] === to) ? currentUser : to, message: msg });
+      }
+    });
+  });
+
+  socket.on('callUser', ({ to }) => {
+    io.sockets.sockets.forEach((s) => {
+      if (onlineUsers[s.id] === to) {
+        s.emit('incomingCall', { from: currentUser });
+      }
+    });
   });
 
   socket.on('disconnect', () => {
-    if (socket.username && socket.room) {
-      socket.to(socket.room).emit('message', { user: 'Сервер', text: `${socket.username} покинул чат` });
-    }
+    delete onlineUsers[socket.id];
   });
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Сервер запущен на порту ${PORT}`));
+server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
