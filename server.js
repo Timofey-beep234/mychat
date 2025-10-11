@@ -18,9 +18,7 @@ let onlineUsers = {}; // socket.id: username
 
 app.post('/register', (req, res) => {
   const { username, password } = req.body;
-  if (users[username]) {
-    return res.status(400).json({ msg: 'User exists' });
-  }
+  if (users[username]) return res.status(400).json({ msg: 'User exists' });
   users[username] = { password, contacts: [], messages: {} };
   res.json({ msg: 'Registered' });
 });
