@@ -2,187 +2,274 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Chat</title>
-  <style>
-    body { background-color: #007bff; color: white; font-family: Arial, sans-serif; margin: 0; }
-    #login, #chat { padding: 20px; }
-    #login { max-width: 300px; margin: 50px auto; }
-    #chat { display: flex; height: 100vh; }
-    #contacts { width: 200px; border-right: 1px solid #003380; overflow-y: auto; }
-    #contacts li { padding: 10px; cursor: pointer; }
-    #contacts li:hover, #contacts li.active { background-color: #0056b3; }
-    #messages { flex: 1; display: flex; flex-direction: column; }
-    #msgList { flex: 1; overflow-y: auto; padding: 10px; }
-    #newMsg { display: flex; }
-    #newMsg input[type=text] { flex: 1; padding: 10px; font-size: 16px; border: none; outline: none; }
-    #newMsg button { padding: 10px 15px; background: #0056b3; border: none; color: white; cursor: pointer; }
-    #newMsg button:hover { background: #004494; }
-    .message { margin-bottom: 10px; }
-    .message strong { display: block; }
-    #photoInput { display: none; }
-  </style>
+<title>Chat</title>
+<style>
+  body {
+    background-color: #007bff;
+    color: white;
+    font-family: Arial, sans-serif;
+    margin: 0;
+    background-image: url('https://cdn.pixabay.com/photo/2014/12/21/23/46/food-575434_1280.png');
+    background-repeat: repeat;
+    background-size: 80px 80px;
+    filter: brightness(0.6);
+  }
+  #login, #chat { padding: 20px; }
+  #login { max-width: 300px; margin: 50px auto; filter: none; background: rgba(0,0,0,0.3); border-radius: 8px; }
+  #chat { display: flex; height: 100vh; filter: none; }
+  #contacts {
+    width: 200px;
+    border-right: 1px solid #003380;
+    overflow-y: auto;
+    background: rgba(0, 0, 50, 0.7);
+    padding: 10px;
+  }
+  #contacts li {
+    padding: 10px;
+    cursor: pointer;
+    list-style: none;
+  }
+  #contacts li:hover, #contacts li.active {
+    background-color: #0056b3;
+  }
+  #messages {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: rgba(0, 0, 0, 0.4);
+  }
+  #msgList {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+  }
+  #newMsg {
+    display: flex;
+    background: rgba(0,0,0,0.6);
+    padding: 10px;
+  }
+  #newMsg input[type=text] {
+    flex: 1;
+    padding: 10px;
+    font-size: 16px;
+    border: none;
+    outline: none;
+    border-radius: 4px;
+  }
+  #newMsg button {
+    padding: 10px 15px;
+    background: #0056b3;
+    border: none;
+    color: white;
+    cursor: pointer;
+    margin-left: 5px;
+    border-radius: 4px;
+  }
+  #newMsg button:hover {
+    background: #004494;
+  }
+  .message {
+    margin-bottom: 10px;
+  }
+  .message strong {
+    display: block;
+  }
+  #photoInput {
+    display: none;
+  }
+  #addContactDiv {
+    padding: 10px;
+    background: rgba(0, 0, 50, 0.6);
+    display: flex;
+  }
+  #contactNameInput {
+    flex: 1;
+    padding: 8px;
+    border-radius: 4px;
+    border: none;
+    font-size: 14px;
+  }
+</style>
 </head>
 <body>
-  <div id="login">
-    <h2>Вход / Регистрация</h2>
-    <input id="username" placeholder="Имя пользователя" />
-    <input id="password" type="password" placeholder="Пароль" />
-    <button id="btnLogin">Войти</button>
-    <button id="btnRegister">Регистрация</button>
-    <p id="loginMsg"></p>
-  </div>
+<div id="login">
+  <h2>Вход / Регистрация</h2>
+  <input id="username" placeholder="Имя пользователя" />
+  <input id="password" type="password" placeholder="Пароль" />
+  <button id="btnLogin">Войти</button>
+  <button id="btnRegister">Регистрация</button>
+  <p id="loginMsg"></p>
+</div>
 
-  <div id="chat" style="display:none;">
+<div id="chat" style="display:none;">
+  <div id="contactsDiv">
     <ul id="contacts"></ul>
-    <div id="messages">
-      <div id="msgList"></div>
-      <div id="newMsg">
-        <input id="msgInput" type="text" placeholder="Введите сообщение" />
-        <button id="btnSend">Отправить</button>
-        <button id="btnPhoto">📷</button>
-        <input id="photoInput" type="file" accept="image/*" />
-      </div>
+    <div id="addContactDiv">
+      <input id="contactNameInput" placeholder="Имя нового контакта" />
+      <button id="btnAddContact">Добавить</button>
     </div>
   </div>
 
-  <script src="/socket.io/socket.io.js"></script>
-  <script>
-    const socket = io();
-    let username = null;
-    let activeContact = null;
-    const usersMessages = {};
+  <div id="messages">
+    <div id="msgList"></div>
+    <div id="newMsg">
+      <input id="msgInput" type="text" placeholder="Введите сообщение 😊" />
+      <button id="btnSend">Отправить</button>
+      <button id="btnPhoto">📷</button>
+      <input id="photoInput" type="file" accept="image/*" />
+    </div>
+  </div>
+</div>
 
-    const loginSection = document.getElementById('login');
-    const chatSection = document.getElementById('chat');
-    const usernameInput = document.getElementById('username');
-    const passwordInput = document.getElementById('password');
-    const btnLogin = document.getElementById('btnLogin');
-    const btnRegister = document.getElementById('btnRegister');
-    const loginMsg = document.getElementById('loginMsg');
-    const contactsList = document.getElementById('contacts');
-    const messagesList = document.getElementById('msgList');
-    const msgInput = document.getElementById('msgInput');
-    const btnSend = document.getElementById('btnSend');
-    const btnPhoto = document.getElementById('btnPhoto');
-    const photoInput = document.getElementById('photoInput');
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+let username = null;
+let activeContact = null;
+const usersMessages = {};
 
-    btnRegister.onclick = async () => {
-      const u = usernameInput.value.trim();
-      const p = passwordInput.value.trim();
-      if (!u || !p) return alert('Введите имя и пароль');
-      const res = await fetch('/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: u, password: p })
-      });
-      if (res.ok) {
-        loginMsg.textContent = 'Успешно зарегистрирован, войдите.';
-      } else {
-        const data = await res.json();
-        loginMsg.textContent = data.msg || 'Ошибка регистрации';
-      }
+const loginSection = document.getElementById('login');
+const chatSection = document.getElementById('chat');
+const usernameInput = document.getElementById('username');
+const passwordInput = document.getElementById('password');
+const btnLogin = document.getElementById('btnLogin');
+const btnRegister = document.getElementById('btnRegister');
+const loginMsg = document.getElementById('loginMsg');
+const contactsList = document.getElementById('contacts');
+const messagesList = document.getElementById('msgList');
+const msgInput = document.getElementById('msgInput');
+const btnSend = document.getElementById('btnSend');
+const btnPhoto = document.getElementById('btnPhoto');
+const photoInput = document.getElementById('photoInput');
+const contactNameInput = document.getElementById('contactNameInput');
+const btnAddContact = document.getElementById('btnAddContact');
+
+btnRegister.onclick = async () => {
+  const u = usernameInput.value.trim();
+  const p = passwordInput.value.trim();
+  if (!u || !p) return alert('Введите имя и пароль');
+  const res = await fetch('/register', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({username:u, password:p})
+  });
+  if(res.ok) {
+    loginMsg.textContent = 'Успешно зарегистрирован, войдите.';
+  } else {
+    const data = await res.json();
+    loginMsg.textContent = data.msg || 'Ошибка регистрации';
+  }
+};
+
+btnLogin.onclick = async () => {
+  const u = usernameInput.value.trim();
+  const p = passwordInput.value.trim();
+  if(!u || !p) return alert('Введите имя и пароль');
+  const res = await fetch('/login', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({username:u, password:p})
+  });
+  if(res.ok) {
+    const data = await res.json();
+    username = u;
+    loginSection.style.display = 'none';
+    chatSection.style.display = 'flex';
+    socket.emit('login', username);
+    updateContacts(data.contacts);
+  } else {
+    const data = await res.json();
+    loginMsg.textContent = data.msg || 'Ошибка входа';
+  }
+};
+
+btnAddContact.onclick = () => {
+  const contactName = contactNameInput.value.trim();
+  if (!contactName) return alert('Введите имя контакта');
+  socket.emit('addContact', contactName);
+  if (!usersMessages[contactName]) usersMessages[contactName] = [];
+  updateContacts(usersMessages ? Object.keys(usersMessages) : []);
+  contactNameInput.value = '';
+};
+
+function updateContacts(contacts) {
+  contactsList.innerHTML = '';
+  contacts.forEach(c => {
+    const li = document.createElement('li');
+    li.textContent = c;
+    li.onclick = () => {
+      activeContact = c;
+      showMessages(c);
+      Array.from(contactsList.children).forEach(li => li.classList.remove('active'));
+      li.classList.add('active');
     };
+    contactsList.appendChild(li);
+  });
+}
 
-    btnLogin.onclick = async () => {
-      const u = usernameInput.value.trim();
-      const p = passwordInput.value.trim();
-      if (!u || !p) return alert('Введите имя и пароль');
-      const res = await fetch('/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: u, password: p })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        username = u;
-        loginSection.style.display = 'none';
-        chatSection.style.display = 'flex';
-        socket.emit('login', username);
-        updateContacts(data.contacts);
-      } else {
-        const data = await res.json();
-        loginMsg.textContent = data.msg || 'Ошибка входа';
-      }
-    };
+function showMessages(contact) {
+  messagesList.innerHTML = '';
+  activeContact = contact;
+  if (!usersMessages[contact]) usersMessages[contact] = [];
+  usersMessages[contact].forEach(m => addMessage(m));
+}
 
-    function updateContacts(contacts) {
-      contactsList.innerHTML = '';
-      contacts.forEach(c => {
-        const li = document.createElement('li');
-        li.textContent = c;
-        li.onclick = () => {
-          activeContact = c;
-          showMessages(c);
-        };
-        contactsList.appendChild(li);
-      });
-    }
+btnSend.onclick = () => {
+  if (!activeContact) return alert('Выберите контакт');
+  const text = msgInput.value.trim();
+  if (!text) return;
+  sendMessage(activeContact, text, 'text');
+  msgInput.value = '';
+};
 
-    function showMessages(contact) {
-      messagesList.innerHTML = '';
-      activeContact = contact;
-      if (!usersMessages[contact]) usersMessages[contact] = [];
-      usersMessages[contact].forEach(m => {
-        addMessage(m);
-      });
-    }
+function sendMessage(to, text, type) {
+  const msg = {from: username, text, type, time: Date.now()};
+  if (!usersMessages[to]) usersMessages[to] = [];
+  usersMessages[to].push(msg);
+  addMessage(msg);
+  socket.emit('sendMessage', {to, text, type});
+}
 
-    btnSend.onclick = () => {
-      if (!activeContact) return alert('Выберите контакт');
-      const text = msgInput.value.trim();
-      if (!text) return;
-      sendMessage(activeContact, text, 'text');
-      msgInput.value = '';
-    };
+socket.on('newMessage', ({contact, message}) => {
+  if (!usersMessages[contact]) usersMessages[contact] = [];
+  usersMessages[contact].push(message);
+  if (contact === activeContact) addMessage(message);
+});
 
-    function sendMessage(to, text, type) {
-      const msg = { from: username, text, type, time: Date.now() };
-      if (!usersMessages[to]) usersMessages[to] = [];
-      usersMessages[to].push(msg);
-      addMessage(msg);
-      socket.emit('sendMessage', { to, text, type });
-    }
+function addMessage({from, text, type, time}) {
+  const div = document.createElement('div');
+  div.classList.add('message');
+  let content = `<strong>${from}</strong>: `;
+  if (type === 'text') content += text;
+  else if(type === 'photo') content += `<br><img src="${text}" style="max-width:200px">`;
+  div.innerHTML = content;
+  messagesList.appendChild(div);
+  messagesList.scrollTop = messagesList.scrollHeight;
+}
 
-    socket.on('newMessage', ({ contact, message }) => {
-      if (!usersMessages[contact]) usersMessages[contact] = [];
-      usersMessages[contact].push(message);
-      if (contact === activeContact) addMessage(message);
-    });
+btnPhoto.onclick = () => photoInput.click();
 
-    function addMessage({ from, text, type, time }) {
-      const div = document.createElement('div');
-      div.classList.add('message');
-      let content = `<strong>${from}</strong>: `;
-      if (type === 'text') content += text;
-      else if (type === 'photo') content += `<br><img src="${text}" style="max-width:200px">`;
-      div.innerHTML = content;
-      messagesList.appendChild(div);
-      messagesList.scrollTop = messagesList.scrollHeight;
-    }
+photoInput.onchange = async () => {
+  if (!photoInput.files.length) return;
+  const file = photoInput.files[0];
+  const formData = new FormData();
+  formData.append('photo', file);
+  const res = await fetch('/upload', {method:'POST', body: formData});
+  if(res.ok) {
+    const data = await res.json();
+    sendMessage(activeContact, data.url, 'photo');
+  }
+  photoInput.value = '';
+};
 
-    btnPhoto.onclick = () => photoInput.click();
-
-    photoInput.onchange = async () => {
-      if (!photoInput.files.length) return;
-      const file = photoInput.files[0];
-      const formData = new FormData();
-      formData.append('photo', file);
-      const res = await fetch('/upload', { method: 'POST', body: formData });
-      if (res.ok) {
-        const data = await res.json();
-        sendMessage(activeContact, data.url, 'photo');
-      }
-      photoInput.value = '';
-    };
-
-    // Пример простого звонка (из уведомления)
-    socket.on('incomingCall', ({ from }) => {
-      if (confirm(`Звонок от ${from}. Принять?`)) {
-        alert('Звонок начат (функционал тут нужно будет доработать)');
-      } else {
-        alert('Звонок отклонен');
-      }
-    });
-  </script>
+// Incoming call notification example
+socket.on('incomingCall', ({from}) => {
+  if(confirm(`Звонок от ${from}. Принять?`)) {
+    alert('Звонок начат (функционал нужно доработать)');
+  } else {
+    alert('Звонок отклонен');
+  }
+});
+</script>
 </body>
 </html>
