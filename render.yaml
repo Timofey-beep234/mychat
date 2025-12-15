@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: Pros.to
+    runtime: node
+    buildCommand: "npm install"
+    startCommand: "npm start"
+    env:
+      - key: PORT
+        value: 10000
+    disk:
+      name: pros-data
+      mountPath: /var/data

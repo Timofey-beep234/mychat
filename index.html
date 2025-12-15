@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Pros.to</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="container">
+  <!-- Экран авторизации -->
+  <div id="auth-screen" class="screen">
+    <div class="auth-card">
+      <h1>Pros.to</h1>
+      <p>Мгновенно. Просто. Безопасно.</p>
+
+      <div class="tabs">
+        <button id="login-tab" class="active">Вход</button>
+        <button id="register-tab">Регистрация</button>
+      </div>
+
+      <form id="auth-form">
+        <input type="text" id="nickname" placeholder="Никнейм" required />
+        <input type="password" id="password" placeholder="Пароль" required />
+        <button type="submit">Продолжить</button>
+      </form>
+      <div id="auth-error" class="error"></div>
+    </div>
+  </div>
+
+  <!-- Экран чата -->
+  <div id="chat-screen" class="screen" style="display: none;">
+    <header>
+      <h1>Pros.to</h1>
+      <div class="header-right">
+        <span>Привет, <strong id="user-nickname"></strong></span>
+        <button id="settings-btn">⚙️</button>
+      </div>
+    </header>
+
+    <!-- Настройки -->
+    <div id="settings-panel" class="settings-panel" style="display: none;">
+      <p>Аккаунт: <strong id="settings-nickname"></strong></p>
+      <button id="logout-btn">Выход</button>
+      <button id="close-settings">Закрыть</button>
+    </div>
+
+    <!-- Поиск -->
+    <div class="search-box">
+      <input type="text" id="search-input" placeholder="Поиск пользователя..." />
+      <button id="search-btn">🔍</button>
+      <div id="search-result"></div>
+    </div>
+
+    <!-- Контакт -->
+    <div class="chat-header">
+      <p>Чат с: <strong id="current-chat-with">никто</strong></p>
+    </div>
+
+    <!-- Сообщения -->
+    <div id="messages" class="messages"></div>
+
+    <!-- Форма -->
+    <form id="message-form" class="form">
+      <input type="text" id="message-input" placeholder="Сообщение..." autocomplete="off" />
+      <button type="submit">➤</button>
+    </form>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

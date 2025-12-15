@@ -1,0 +1,119 @@
+// server.js
+const express = require('express');
+const http = require('http');
+const socketIo = require('socket.io');
+const path = require('path');
+const bcrypt = require('bcrypt');
+
+const app = express();
+const server = http.createServer(app);
+const io = socketIo(server);
+
+// Middleware
+app.use(express.static(__dirname));
+app.use(express.json());
+
+// База пользователей в памяти (в продакшене — база данных)
+const users = new Map(); // nickname → { hashedPassword, socketId }
+const sessions = new Map(); // socketId → nickname
+
+// === Маршрут: Регистрация ===
+app.post('/register', async (req, res) => {
+    const { nickname, password } = req.body;
+
+    if (!nickname || !password) {
+        return res.status(400).json({ error: 'Ник и пароль обязательны' });
+    }
+
+    if (users.has(nickname)) {
+        return res.status(409).json({ error: 'Такой ник уже занят' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    users.set(nickname, { hashedPassword, socketId: null });
+
+    console.log(`✅ Пользователь зарегистрирован: ${nickname}`);
+    res.status(201).json({ success: true });
+});
+
+// === Маршрут: Вход ===
+app.post('/login', async (req, res) => {
+    const { nickname, password } = req.body;
+
+    const userData = users.get(nickname);
+    if (!userData) {
+        return res.status(401).json({ error: 'Неверный логин или пароль' });
+    }
+
+    const isMatch = await bcrypt.compare(password, userData.hashedPassword);
+    if (!isMatch) {
+        return res.status(401).json({ error: 'Неверный логин или пароль' });
+    }
+
+    res.json({ success: true });
+});
+
+// === Главная страница ===
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// === Socket.IO ===
+io.on('connection', (socket) => {
+    console.log('🔌 Подключён пользователь:', socket.id);
+
+    // Аутентификация: пользователь сообщает свой ник после входа
+    socket.on('authenticate', (nickname) => {
+        if (!users.has(nickname)) return;
+
+        const userData = users.get(nickname);
+        userData.socketId = socket.id;
+        sessions.set(socket.id, nickname);
+
+        console.log(`🟢 ${nickname} вошёл в систему`);
+        socket.emit('auth-success', { nickname });
+    });
+
+    // Поиск пользователя по нику
+    socket.on('search-user', (nickname) => {
+        const found = users.has(nickname) && users.get(nickname).socketId !== null;
+        socket.emit('search-result', { nickname, online: found });
+    });
+
+    // Отправка личного сообщения
+    socket.on('private-message', ({ to, message }) => {
+        const userData = users.get(to);
+        const from = sessions.get(socket.id);
+
+        if (!from) return;
+
+        if (userData && userData.socketId) {
+            // Отправляем получателю
+            io.to(userData.socketId).emit('private-message', {
+                from,
+                message
+            });
+            // Подтверждение отправителю
+            socket.emit('message-sent', { to, message });
+        } else {
+            socket.emit('error', { message: 'Пользователь не в сети или не существует' });
+        }
+    });
+
+    // Отключение
+    socket.on('disconnect', () => {
+        const nickname = sessions.get(socket.id);
+        if (nickname) {
+            const userData = users.get(nickname);
+            if (userData) userData.socketId = null;
+            sessions.delete(socket.id);
+            console.log(`🔴 ${nickname} отключился`);
+        }
+    });
+});
+
+// Запуск сервера
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+    console.log(`🚀 Pros.to запущен на http://localhost:${PORT}`);
+});
